@@ -24,10 +24,6 @@ class PaymentAction implements OptionSourceInterface
             [
                 'value' => MethodInterface::ACTION_AUTHORIZE,
                 'label' => __('Authorize')
-            ],
-            [
-                'value' => MethodInterface::ACTION_ORDER,
-                'label' => __('Order')
             ]
         ];
     }
