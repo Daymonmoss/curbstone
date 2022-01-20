@@ -1,0 +1,91 @@
+<!--
+/**
+ * Copr. 2018 Curbstone Corporation MLP V0.92
+ */
+-->
+<div class="payment-method" data-bind="css: {'_active': (getCode() == isChecked())}">
+    <div class="payment-method-title field choice">
+        <input type="radio"
+               name="payment[method]"
+               class="radio"
+               data-bind="attr: {'id': getCode()}, value: getCode(), checked: isChecked, click: selectPaymentMethod, visible: isRadioButtonVisible()"/>
+        <label data-bind="attr: {'for': getCode()}" class="label"><span data-bind="text: getTitle()"></span></label>
+    </div>
+    <div class="payment-method-content">
+        <!-- ko foreach: getRegion('messages') -->
+        <!-- ko template: getTemplate() --><!-- /ko -->
+        <!--/ko-->
+        <div class="payment-method-billing-address">
+            <!-- ko foreach: $parent.getRegion(getBillingAddressFormName()) -->
+            <!-- ko template: getTemplate() --><!-- /ko -->
+            <!--/ko-->
+        </div>
+        <div class="checkout-agreements-block">
+            <!-- ko foreach: $parent.getRegion('before-place-order') -->
+                <!-- ko template: getTemplate() --><!-- /ko -->
+            <!--/ko-->
+        </div>
+
+        <!-- ko if: (isAvailableTokens())-->
+            <div class="field choice">
+                <input type="checkbox"
+                       name="payment[method]use-store-card"
+                       class="checkbox"
+                       data-bind="attr: {'id': getCode() + '_card_on_file'}, 'checked': useCardOnfile()"/>
+                <label class="label" data-bind="attr: {'for': getCode() + '_card_on_file'}">
+                    <span><!-- ko i18n: 'Use a previous card' --><!-- /ko --></span>
+                </label>
+            </div>
+            <!-- ko foreach: getListTokens() -->
+                <div class="store-card-list" style="display: none">
+                    <div class="payment-method-title field choice">
+                        <input type="radio"
+                               name="payment[method]store-cart"
+                               class="radio"
+                               data-bind="
+                                    attr: {'id': 'token_' + token}
+                                    value: token,
+                                    'checked': $parent.selectToken() "/>
+                        <label class="label" data-bind="attr: {'for': 'token_' + token}">
+                            <img data-bind="attr: {
+                                'src': $parent.getIcons(type).url,
+                                'width': $parent.getIcons(type).width,
+                                'height': $parent.getIcons(type).height
+                                }" class="payment-icon">
+                            <span translate="'ending'"></span>
+                            <span data-bind="text: maskCC"></span>
+                            <span translate="'expires'"></span>
+                            <span data-bind="text: expired"></span>
+                        </label>
+                    </div>
+                </div>
+            <!--/ko-->
+        <!-- /ko -->
+        <!-- ko if: (isVaultEnabled())-->
+        <div class="field choice">
+            <input type="checkbox"
+                   name="vault[is_enabled]"
+                   class="checkbox"
+                   data-bind="attr: {'id': getCode() + '_enable_vault'}, 'checked': setCardOnfile()"/>
+            <label class="label" data-bind="attr: {'for': getCode() + '_enable_vault'}">
+                <span><!-- ko i18n: 'Save for later use.'--><!-- /ko --></span>
+            </label>
+        </div>
+        <!-- /ko -->
+        <div class="actions-toolbar">
+            <div class="primary">
+                <button class="action primary checkout"
+                        type="submit"
+                        data-bind="
+                        click: placeOrderToCurbstone,
+                        attr: {title: $t('Continue')},
+                        css: {disabled: !isPlaceOrderActionAllowed()},
+                        enable: (getCode() == isChecked())
+                        "
+                        disabled>
+                    <span data-bind="i18n: 'Continue'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
