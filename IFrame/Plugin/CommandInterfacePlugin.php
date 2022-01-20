@@ -14,10 +14,12 @@ class CommandInterfacePlugin
     public function aroundExecute(CommandInterface $subject, \Closure $proceed, OrderPaymentInterface $payment, $amount, OrderInterface $order)
     {
         $result = $proceed($payment, $amount, $order);
-        if ($payment->getMethod() == ConfigProvider::CODE && $payment->getAnetTransMethod() == MethodInterface::ACTION_AUTHORIZE) {
-            $orderStatus = Order::STATE_NEW;
-            if ($orderStatus && $order->getState() == Order::STATE_PROCESSING) {
-                $order->setStatus($orderStatus);
+        $paymentMethod = $payment->getMethod();
+        $paymentTransactionType = $payment->getMethodInstance()->getConfigPaymentAction();
+        if ($paymentMethod == ConfigProvider::CODE && $paymentTransactionType == MethodInterface::ACTION_AUTHORIZE) {
+            if ($order->getState() || $order->getStatus() == Order::STATE_PROCESSING) {
+                $order->setStatus(Order::STATE_NEW);
+                $order->setState(Order::STATE_NEW);
             }
         }
 
