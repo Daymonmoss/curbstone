@@ -1,0 +1,11 @@
+<!-- ko if: (isVaultEnabled())-->
+<div class="field choice">
+    <input type="checkbox"
+           name="cardonfile[is_enabled]"
+           class="checkbox"
+           data-bind="attr: {'id': getCode() + '_enable_vault'}, 'checked': isShow, 'click': showIframe()"/>
+    <label class="label" data-bind="attr: {'for': getCode() + '_enable_vault'}">
+        <span><!-- ko i18n: 'Add new card.'--><!-- /ko --></span>
+    </label>
+</div>
+<!-- /ko -->

@@ -24,10 +24,7 @@
     <preference for="Magento\Payment\Model\InfoInterface" type="Magento\Payment\Model\Info"/>
     <preference for="Magento\Payment\Gateway\Data\OrderAdapterInterface"
                 type="Magento\Payment\Gateway\Data\Order\OrderAdapter"/>
-    <!-- Payment Method plugins configuration -->
-    <type name="Magento\Payment\Model\Method\Adapter">
-        <plugin name="curbstone_method_adapter" type="Curbstone\IFrame\Plugin\MagentoPaymentMethodAdapterInfoInstance"/>
-    </type>
+    <!-- Authorize order status plugin configuration -->
     <type name="Magento\Sales\Model\Order\Payment\State\CommandInterface">
         <plugin name="curbstone_order_status" type="Curbstone\IFrame\Plugin\CommandInterfacePlugin"/>
     </type>
@@ -41,8 +38,6 @@
     <virtualType name="CurbstoneFacade" type="Magento\Payment\Model\Method\Adapter">
         <arguments>
             <argument name="code" xsi:type="const">Curbstone\IFrame\Model\Ui\ConfigProvider::CODE</argument>
-            <argument name="formBlockType" xsi:type="string">Magento\Payment\Block\Form</argument>
-            <argument name="infoBlockType" xsi:type="string">Magento\Payment\Block\Info</argument>
             <argument name="valueHandlerPool" xsi:type="object">CurbstoneValueHandlerPool</argument>
             <argument name="validatorPool" xsi:type="object">CurbstoneValidatorPool</argument>
             <argument name="commandPool" xsi:type="object">CurbstoneCommandPool</argument>
@@ -83,19 +78,16 @@
         <arguments>
             <argument name="validators" xsi:type="array">
                 <item name="global" xsi:type="string">CurbstoneGlobalValidator</item>
-                <item name="availability" xsi:type="string">Curbstone\IFrame\Gateway\Validator\AvailabilityValidator
-                </item>
+                <item name="availability" xsi:type="string">Curbstone\IFrame\Gateway\Validator\AvailabilityValidator</item>
             </argument>
         </arguments>
     </virtualType>
     <!-- Command Pool configuration -->
     <virtualType name="CurbstoneCaptureGatewayCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
         <arguments>
-            <argument name="requestBuilder" xsi:type="object">Magento\Payment\Gateway\Request\BuilderComposite
-            </argument>
+            <argument name="requestBuilder" xsi:type="object">Magento\Payment\Gateway\Request\BuilderComposite</argument>
             <argument name="handler" xsi:type="object">Magento\Payment\Gateway\Response\HandlerChain</argument>
-            <argument name="transferFactory" xsi:type="object">Magento\Payment\Gateway\Http\TransferFactoryInterface
-            </argument>
+            <argument name="transferFactory" xsi:type="object">Magento\Payment\Gateway\Http\TransferFactory</argument>
         </arguments>
     </virtualType>
     <virtualType name="CurbstoneCommandPool" type="Magento\Payment\Gateway\Command\CommandPool">
@@ -121,8 +113,6 @@
         <arguments>
             <argument name="handlers" xsi:type="array">
                 <item name="default" xsi:type="string">CurbstoneVaultPaymentValueHandler</item>
-                <item name="can_void" xsi:type="string">Magento\Payment\Gateway\Config\ConfigValueHandler</item>
-                <item name="can_cancel" xsi:type="string">Magento\Payment\Gateway\Config\ConfigValueHandler</item>
                 <item name="can_authorize" xsi:type="string">Magento\Payment\Gateway\Config\ConfigValueHandler</item>
                 <item name="can_capture" xsi:type="string">Magento\Payment\Gateway\Config\ConfigValueHandler</item>
             </argument>

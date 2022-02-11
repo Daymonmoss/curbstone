@@ -64,22 +64,29 @@ define(
                 var iFrame_src = urlBuilder.build('curbstone_iframe/index/load');
                 var iFrame_width = ($(window).width() < 500) ? $(window).width() : 500;
                 var iFrame_height = (document.documentElement.clientHeight / 2) - 325;
-                var loading = '<div id="curbstone-modal-content" style="width: ' + iFrame_width + 'px;padding: 0;position: fixed;z-index: 9999;margin: 0 auto;left: 0;right: 0;top: 30%;">' +
-                    '<div id="curbstone-modal-modal-child" style="position: relative; background-color: #fff;">' +
-                    '<div style="width:100%;text-align:right;">' +
-                    '<a href="" id="curbstone-close-iFrame">X</a>' +
+                var loading = '<div id="curbstone-modal-content" style="width: ' + iFrame_width + 'px;padding: 0;z-index:9998;position: fixed;margin: 0 auto;left: 0;right: 0;top: 30%;">' +
+                    '<div id="curbstone-modal-modal-child" style="position: relative; background-color: #fff;border: 2px solid #0c369c;">' +
+                    '<div style="text-align:right;padding: 10px 15px;">' +
+                    '<a href="" id="curbstone-close-iFrame" style="color:#0c369c;text-decoration:none;font-weight: 900;">X</a>' +
                     '</div>' +
                     '</div>' +
                     '</div>';
                 if (document.getElementById('curbstone-view-detail-processing-modal')) {
                     $('#curbstone-view-detail-processing-modal').remove();
                 }
-                if (!$('.loading-mask')) {
-                    $('body').append('<div class="loading-mask"></div>');
-                }
                 if (!document.getElementById('curbstone-view-detail-processing-modal')) {
                     var overlay = $(document.createElement('div'));
                     $(overlay).attr('id', 'curbstone-view-detail-processing-modal');
+                    $(overlay).css({
+                        'position': "fixed",
+                        'left': 0,
+                        'top': 0,
+                        'width': '100%',
+                        'height': '100%',
+                        'overflow': 'auto',
+                        'background': "rgba(255, 255, 255, 0.75)",
+                        'z-index': 200
+                    });
                     overlay.append(loading);
                     $('body').append(overlay);
                     $.get({
@@ -97,18 +104,16 @@ define(
                             el.attr('sandbox', "allow-top-navigation allow-scripts allow-forms");
                             el.css("width", "100%");
                             el.css("height", "320px");
-                            el.css("border", "#ccc 1px solid");
+                            fullScreenLoader.stopLoader();
                         }
                     });
                     $('#curbstone-close-iFrame').click(function () {
                         $('#curbstone-view-detail-processing-modal').remove();
-                        $('.loading-mask').hide();
                         return false;
                     });
                 }
             },
             isAvailableTokens: function () {
-                console.log(listTokens().length > 0);
                 return listTokens().length > 0;
             },
             selectToken: function () {

@@ -1,38 +1,44 @@
 <?php
 /* Copr. 2018 Curbstone Corporation MLP V0.92 */
 
-namespace Curbstone\IFrame\Controller\Index;
+namespace Curbstone\CardOnFile\Controller\Index;
 
+use Curbstone\IFrame\Helper\CurbstoneLog;
 use Curbstone\IFrame\Model\Payment\CurbstonePayload;
-use Magento\Checkout\Model\Session as CheckoutSession;
-use Magento\Framework\App\ActionInterface;
+use Curbstone\CardOnFile\Model\Payment\CardOnFilePayload;
+use Magento\Customer\Api\AddressRepositoryInterface;
+use Magento\Customer\Api\CustomerRepositoryInterface;
+use Magento\Customer\Model\Session;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Controller\Result\JsonFactory;
-use Curbstone\IFrame\Helper\CurbstoneLog;
+use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Store\Model\ScopeInterface;
 
-class Load implements ActionInterface
+class Load extends \Curbstone\IFrame\Controller\Index\Load
 {
-    protected JsonFactory $resultJsonFactory;
-    protected CheckoutSession $checkoutSession;
-    protected ScopeConfigInterface $scopeConfig;
-    protected CurbstonePayload $curbstonePayload;
-    protected CurbstoneLog $payLog;
+    protected Session $customerSession;
+    protected CustomerRepositoryInterface $customerRepository;
+    protected AddressRepositoryInterface $addressRepository;
+    private CardOnFilePayload $payLoad;
 
     public function __construct(
         JsonFactory $resultJsonFactory,
         CheckoutSession $checkoutSession,
         ScopeConfigInterface $scopeConfig,
         CurbstonePayload $curbstonePayload,
-        CurbstoneLog $payLog
+        CardOnFilePayload $payLoad,
+        CurbstoneLog $payLog,
+        Session $customerSession,
+        CustomerRepositoryInterface $customerRepository,
+        AddressRepositoryInterface $addressRepository
     ) {
-        $this->resultJsonFactory = $resultJsonFactory;
-        $this->checkoutSession = $checkoutSession;
-        $this->scopeConfig = $scopeConfig;
-        $this->curbstonePayload = $curbstonePayload;
-        $this->payLog = $payLog;
+        parent::__construct($resultJsonFactory, $checkoutSession, $scopeConfig, $curbstonePayload, $payLog);
+        $this->customerSession = $customerSession;
+        $this->customerRepository = $customerRepository;
+        $this->addressRepository = $addressRepository;
+        $this->payLoad = $payLoad;
     }
 
     /**
@@ -41,10 +47,12 @@ class Load implements ActionInterface
      */
     public function execute()
     {
-        $quote = $this->checkoutSession->getQuote();
-        $billingAddress = $quote->getBillingAddress();
+        $customer = $this->customerRepository->getById($this->customerSession->getCustomer()->getId());
+        $customerBillAddress = $this->addressRepository->getById($customer->getDefaultBilling());
+        $customerShipAddress = $this->addressRepository->getById($customer->getDefaultShipping());
+        $billingAddress = $customerBillAddress ?: $customerShipAddress;
         $PLP_API_URL = $this->scopeConfig->getValue('payment/curbstone_iframe/api_url', ScopeInterface::SCOPE_STORE);
-        $payload = $this->curbstonePayload->payLoad($billingAddress,$quote);
+        $payload = $this->payLoad->payLoad($billingAddress, $customer);
         $this->payLog->writePaylog("Request load iFrame Data:");
         $this->payLog->writePaylog(print_r($payload, true));
         $payload_string = '';

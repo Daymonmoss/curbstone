@@ -36,7 +36,7 @@ class CardOnFile
         $payload['MFMRCH'] = $this->scopeConfig->getValue('payment/curbstone_iframe/merchant_code', ScopeInterface::SCOPE_STORE); // Curbstone merchant code
         $payload['MFUSER'] = $customer->getFirstname(). ' ' . $customer->getLastname();
         $payload['MFTYPE'] = $this->scopeConfig->getValue('payment/curbstone_iframe/txn_type', ScopeInterface::SCOPE_STORE);
-        $payload['MFTYP2'] = $this->scopeConfig->getValue('payment/curbstone_iframe/txn_type2', ScopeInterface::SCOPE_STORE);
+        $payload['MFTYP2'] = $this->scopeConfig->getValue('payment/curbstone_iframe/payment_action', ScopeInterface::SCOPE_STORE) !== 'authorize_capture' ? 'PA' : 'SA'; // Request Authorization
         $payload['MFMETH'] = $this->scopeConfig->getValue('payment/curbstone_iframe/entry_method', ScopeInterface::SCOPE_STORE);
         $payload['MFREFR'] = '';
         $payload['MFAMT1'] = 1.01;

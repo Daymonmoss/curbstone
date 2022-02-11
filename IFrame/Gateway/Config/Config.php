@@ -6,6 +6,7 @@
 
 namespace Curbstone\IFrame\Gateway\Config;
 
+use Curbstone\IFrame\Model\Ui\ConfigProvider;
 /**
  * Class Config
  * @codeCoverageIgnore
@@ -16,6 +17,7 @@ class Config extends \Magento\Payment\Gateway\Config\Config
 
     public function getTitle()
     {
+        $this->setMethodCode(ConfigProvider::CODE);
         return $this->getValue(self::KEY_TITLE);
     }
 }

@@ -18,15 +18,20 @@ class CurbstoneiFrame implements MethodInterface, PaymentMethodInterface
 
     private CartFactory $cartFactory;
     private Adapter $adapter;
+    private InfoInterface $info;
 
 
     public function __construct
     (
         Adapter $adapter,
-        CartFactory $cartFactory
+        CartFactory $cartFactory,
+        InfoInterFace $info
+
     ) {
         $this->cartFactory = $cartFactory;
         $this->adapter = $adapter;
+        $this->info = $info;
+
     }
 
     public function isActive($storeId = null)
@@ -63,13 +68,27 @@ class CurbstoneiFrame implements MethodInterface, PaymentMethodInterface
 
     public function assignData(DataObject $data)
     {
-        return $this->adapter->assignData($data);
+        $addData = $this->getInfoInstance()->setAdditionalInformation($data->getData('additional_data'));
+        $this->setInfoInstance($addData);
     }
 
     public function authorize(InfoInterface $payment, $amount)
     {
         if (!$this->canAuthorize()) {
             throw new LocalizedException(__('The authorize action is not available.'));
+        }
+        try{
+            $cart = $this->cartFactory->create();
+            $quotePayment = $cart->getQuote()->getPayment();
+            $additional = ($quotePayment->getData('additional_information'));
+            if(isset($additional['tokenValue']) && $additional['tokenValue'] && $payment->getLastTransId() == null) {
+                $payment->setTransactionId($additional['tokenValue']);
+                $payment->setLastTransId($additional['tokenValue']);
+                $addData = ['vault_gateway_token' => $additional['tokenValue'], 'card' => $additional['cardMasked']];
+                $payment->setAdditionalInformation($addData);
+            }
+        } catch (\Exception $e) {
+
         }
         return $this;
     }
@@ -88,18 +107,6 @@ class CurbstoneiFrame implements MethodInterface, PaymentMethodInterface
     {
         if (!$this->canCapture()) {
             throw new LocalizedException(__('The capture action is not available.'));
-        }
-        try{
-            $cart = $this->cartFactory->create();
-            $quotePayment = $cart->getQuote()->getPayment();
-            $additional = ($quotePayment->getData('additional_information'));
-            if(isset($additional['tokenValue']) && $additional['tokenValue']) {
-                $payment->setTransactionId($additional['tokenValue']);
-                $payment->setLastTransId($additional['tokenValue']);
-                $payment->setAdditionalInformation(['request_id' => $additional['tokenValue']]);
-            }
-        } catch (\Exception $e) {
-
         }
         return $this;
     }
@@ -231,22 +238,22 @@ class CurbstoneiFrame implements MethodInterface, PaymentMethodInterface
 
     public function getFormBlockType()
     {
-        return $this->adapter->getFormBlockType();
+         return "Magento\Payment\Block\Form";
     }
 
     public function getInfoBlockType()
     {
-        return $this->adapter->getInfoBlockType();
+         return "Magento\Payment\Block\Info";
     }
 
     public function getInfoInstance()
     {
-        return $this->adapter->getInfoInstance();
+        return $this->info;
     }
 
     public function setInfoInstance(InfoInterface $info)
     {
-        $this->adapter->setInfoInstance($info);
+        $this->info = $info;
     }
 
     public function getStore()

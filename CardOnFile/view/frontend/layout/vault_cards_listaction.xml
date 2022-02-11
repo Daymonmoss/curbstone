@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <head>
+        <script src="Curbstone_IFrame::js/plp.js"/>
+    </head>
+    <body>
+        <referenceContainer name="content">
+            <block class="Curbstone\CardOnFile\Block\Customer\NewCard" name="cubstone.newcard.renderer" template="Curbstone_CardOnFile::customer_account/newcard.phtml">
+                <arguments>
+                    <argument name="jsLayout" xsi:type="array">
+                        <item name="components" xsi:type="array">
+                            <item name="cardonfile" xsi:type="array">
+                                <item name="component" xsi:type="string">Curbstone_CardOnFile/js/view/cardonfileccform</item>
+                                <item name="displayArea" xsi:type="string">cardonfile</item>
+                            </item>
+                        </item>
+                    </argument>
+                </arguments>
+            </block>
+            <referenceBlock name="vault.cards.list" template="Curbstone_CardOnFile::cards_list.phtml">
+                <block class="Curbstone\CardOnFile\Block\Customer\CardRenderer" name="cubstone.iframe.card.renderer" template="Curbstone_CardOnFile::customer_account/credit_card.phtml"/>
+            </referenceBlock>
+        </referenceContainer>
+    </body>
+</page>

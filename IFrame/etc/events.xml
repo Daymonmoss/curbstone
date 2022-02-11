@@ -1,9 +1,0 @@
-<?xml version="1.0"?>
-<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
-    <event name="payment_method_assign_data">
-        <observer name="curbstone_cardonfile_payment_data_assign" instance="Curbstone\IFrame\Observer\PaymentAdditionalDataAssignObserver" />
-    </event>
-    <event name="sales_order_place_after">
-        <observer name="curbstone_cardonfile_update_order_info" instance="Curbstone\IFrame\Observer\UpdateOrderObserver" />
-    </event>
-</config>

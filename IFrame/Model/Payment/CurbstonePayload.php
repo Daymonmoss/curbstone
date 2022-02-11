@@ -3,7 +3,7 @@
 /* ...\Curbstone\iFrame\Model\Payment\CurbstonePayload.php  */
 namespace Curbstone\IFrame\Model\Payment;
 
-use Magento\Directory\Model\RegionFactory;
+use Magento\Directory\Model\ResourceModel\Region\Collection as RegionCollection;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Request\Http;
 use Magento\Framework\Data\Form\FormKey;
@@ -12,25 +12,23 @@ use Magento\Store\Model\ScopeInterface;
 
 class CurbstonePayload
 {
-    protected $request;
-    protected $scopeConfig;
-    protected $_regionFactory;
-    /**
-     * @var UrlInterface
-     */
-    protected $_urlInterface;
+    protected Http $request;
+    protected ScopeConfigInterface $scopeConfig;
+    protected RegionCollection $regionCollection;
+    protected UrlInterface $urlInterface;
+    protected FormKey $formKey;
 
     public function __construct(
         ScopeConfigInterface $scopeConfig,
         Http $request,
         UrlInterface $urlInterface,
-        RegionFactory $regionFactory,
+        RegionCollection $regionCollection,
         FormKey $formKey
     ) {
         $this->scopeConfig = $scopeConfig;
         $this->request = $request;
-        $this->_urlInterface = $urlInterface;
-        $this->_regionFactory = $regionFactory;
+        $this->urlInterface = $urlInterface;
+        $this->regionCollection = $regionCollection;
         $this->formKey = $formKey;
     }
 
@@ -39,6 +37,11 @@ class CurbstonePayload
         return $this->formKey->getFormKey();
     }
 
+    /**
+     * @param $billingAddress
+     * @param $quote
+     * @return array
+     */
     public function payLoad(
         $billingAddress, $quote
     ) {
@@ -48,10 +51,9 @@ class CurbstonePayload
         }
         $regionCode = '';
         if (is_numeric($billingAddress->getRegionId())) {
-            $region = $this->_regionFactory->create()->load($billingAddress->getRegionId() );
-            $regionCode =$region->getCode();
+            $regionCode = $this->regionCollection->getItemById($billingAddress->getRegionId());
         }
-        $MPCUSF = $this->request->getParam('quoteEmail') ? 'quoteEmail='.$this->request->getParam('quoteEmail') : '' .'&cardOnFile='.$this->request->getParam('cardOnFile');
+        $MPCUSF = 'quoteEmail='.$this->request->getParam('quoteEmail') . '&cardOnFile='.$this->request->getParam('cardOnFile');
         $payload = array(
             'MFADD1' => isset($billingAddress->getStreet()[0]) ? $billingAddress->getStreet()[0] : '',
             'MFADD2' => isset($billingAddress->getStreet()[1]) ? $billingAddress->getStreet()[1] : '',
@@ -84,7 +86,7 @@ class CurbstonePayload
             'MFZIPC' => $billingAddress->getPostcode(),
             'MPCUSF' => $MPCUSF.'&reservedOrderId='.$quote->getReservedOrderId().'&form_key='.$this->getFormKey(),
             'MPCUST' => $customer->getId() ? $customer->getId() : '',
-            'MPTRGT' => $this->_urlInterface->getUrl('curbstone_iframe/index/callback'),
+            'MPTRGT' => $this->urlInterface->getUrl('curbstone_iframe/index/callback'),
             'MFCUST' => $this->scopeConfig->getValue('payment/curbstone_iframe/customer_number', ScopeInterface::SCOPE_STORE)
         );
         return $payload;

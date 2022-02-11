@@ -3,14 +3,19 @@
 
 namespace Curbstone\IFrame\Controller\Index;
 
-use Magento\Checkout\Model\Session;
+use Magento\Checkout\Model\Session as CheckoutSession;
+use Magento\Checkout\Model\Session\SuccessValidator;
+use Magento\Customer\Model\Session as CustomerSession;
+use Magento\Checkout\Model\Type\Onepage;
 use Magento\Framework\App\ActionInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\App\ResponseInterface;
-use Magento\Framework\Controller\ResultFactory;
-use Magento\Checkout\Model\Type\Onepage;
+use Magento\Framework\App\Response\RedirectInterface;
+use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Quote\Api\CartRepositoryInterface;
+use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\QuoteManagement;
 use Magento\Sales\Api\OrderPaymentRepositoryInterface;
 use Magento\Sales\Model\Order\Payment\Transaction;
@@ -23,48 +28,42 @@ use Magento\Vault\Model\PaymentTokenRepository;
 use Magento\Framework\Message\ManagerInterface;
 use Curbstone\IFrame\Helper\RequestDataBuilder;
 use Curbstone\IFrame\Helper\CurbstoneLog;
-use Curbstone\IFrame\Model\Payment\CardOnFile;
 use Curbstone\IFrame\Model\Ui\ConfigProvider;
-use Magento\Framework\App\Response\RedirectInterface;
-use Magento\Checkout\Model\Session\SuccessValidator;
 
 
 class Callback implements ActionInterface
 {
-    private $checkoutSession;
-    /**
-     * @var RequestDataBuilder
-     */
     private RequestDataBuilder $requestDataBuilder;
     private CartRepositoryInterface $quoteRepository;
     private QuoteManagement $quoteManagement;
-    protected CardOnFile $cardOnFile;
-    private ScopeConfigInterface $_scopeConfig;
-    protected $_payLog;
-    protected PaymentTokenFactoryInterface $paymentTokenFactory;
-    protected EncryptorInterface $encryptor;
-    protected Session $customerSession;
-    protected ManagerInterface $messageManager;
-    protected RequestInterface $request;
-    protected ResponseInterface $response;
-    protected RedirectInterface $redirect;
-    protected SuccessValidator $successValidator;
+    private ScopeConfigInterface $scopeConfig;
+    private CurbstoneLog $payLog;
+    private PaymentTokenFactoryInterface $paymentTokenFactory;
+    private EncryptorInterface $encryptor;
+    private CheckoutSession $checkoutSession;
+    private ManagerInterface $messageManager;
+    private RequestInterface $request;
+    private ResponseInterface $response;
+    private RedirectInterface $redirect;
+    private SuccessValidator $successValidator;
+    private BuilderInterface $transactionBuilder;
+    private OrderPaymentRepositoryInterface $orderPaymentRepository;
+    private PaymentTokenRepository $paymentTokenRepository;
+    private CustomerSession $customerSession;
 
     public function __construct(
         RequestDataBuilder $requestDataBuilder,
-        Session $checkoutSession,
+        CheckoutSession $checkoutSession,
         QuoteManagement $quoteManagement,
-        ResultFactory $result,
         CartRepositoryInterface $quoteRepository,
         BuilderInterface $builderInterface,
         OrderPaymentRepositoryInterface $orderPaymentRepository,
         ScopeConfigInterface $scopeConfig,
-        CurbstoneLog $curbstoneLog,
-        CardOnFile $cardOnFile,
+        CurbstoneLog $payLog,
         PaymentTokenFactoryInterface $paymentTokenFactory,
         EncryptorInterface $encryptor,
         PaymentTokenRepository $paymentTokenRepository,
-        Session $customerSession,
+        CustomerSession $customerSession,
         ManagerInterface $messageManager,
         RequestInterface $request,
         ResponseInterface $response,
@@ -74,14 +73,12 @@ class Callback implements ActionInterface
     {
         $this->checkoutSession = $checkoutSession;
         $this->requestDataBuilder = $requestDataBuilder;
-        $this->quoteRepository = $quoteRepository;
         $this->quoteManagement = $quoteManagement;
-        $this->resultFactory = $result;
-        $this->_transactionBuilder = $builderInterface;
+        $this->quoteRepository = $quoteRepository;
+        $this->transactionBuilder = $builderInterface;
         $this->orderPaymentRepository = $orderPaymentRepository;
-        $this->_scopeConfig = $scopeConfig;
-        $this->cardOnFile = $cardOnFile;
-        $this->_payLog = $curbstoneLog;
+        $this->scopeConfig = $scopeConfig;
+        $this->payLog = $payLog;
         $this->paymentTokenFactory = $paymentTokenFactory;
         $this->encryptor = $encryptor;
         $this->paymentTokenRepository = $paymentTokenRepository;
@@ -97,9 +94,9 @@ class Callback implements ActionInterface
     {
         $response = $this->getRequest()->getParams();
         $resultUrl = 'checkout/cart';
-        $this->_payLog->writePaylog("Response place order Data:");
-        $this->_payLog->writePaylog(print_r($response, true));
-        $cardOnFile = $this->_scopeConfig->getValue('payment/curbstone_iframe/store_card', ScopeInterface::SCOPE_STORE);
+        $this->payLog->writePaylog("Response place order Data:");
+        $this->payLog->writePaylog(print_r($response, true));
+        $cardOnFile = $this->scopeConfig->getValue('payment/curbstone_iframe/store_card', ScopeInterface::SCOPE_STORE);
         if (array_key_exists('MFRTRN', $response)) {
             // Determine if the transaction was successful
             switch ($response['MFRTRN']) {
@@ -107,7 +104,7 @@ class Callback implements ActionInterface
                     if($cardOnFile && isset($response['cardOnFile']) && $response['cardOnFile'] == 'true' && $this->customerSession->isLoggedIn()) {
                         $this->createVaultToken($response);
                     }
-                    $this->_submitOrder($response, $resultUrl);
+                    $this->submitOrder($response, $resultUrl);
                     break;
                 case 'UN':
                     $confirmation_msg = 'Authorization declined: ' . $response['MFRTXT'];
@@ -127,8 +124,13 @@ class Callback implements ActionInterface
         }
     }
 
-    protected function _submitOrder($response, $resultUrl)
+    /**
+     * @throws NoSuchEntityException
+     * @throws LocalizedException
+     */
+    protected function submitOrder($response, $resultUrl)
     {
+        /** @var Quote $quote */
         $quote = $this->checkoutSession->getQuote();
         if ($this->requestDataBuilder->getCheckoutMethod($quote) === Onepage::METHOD_GUEST) {
             $quote->getBillingAddress()->setEmail($response['quoteEmail']);
@@ -197,10 +199,10 @@ class Callback implements ActionInterface
         $formatedPrice = $order->getBaseCurrency()->formatTxt(
             $order->getGrandTotal()
         );
-        $iFramePaymentAction = $this->_scopeConfig->getValue('payment/curbstone_iframe/payment_action', ScopeInterface::SCOPE_STORE);
+        $iFramePaymentAction = $this->scopeConfig->getValue('payment/curbstone_iframe/payment_action', ScopeInterface::SCOPE_STORE);
         if ($iFramePaymentAction == 'authorize') {
             $message = __('The authorized amount is %1.', $formatedPrice);
-            $transaction = $this->_transactionBuilder->setPayment($payment)
+            $transaction = $this->transactionBuilder->setPayment($payment)
                 ->setOrder($order)
                 ->setTransactionId($response['MFUKEY'])
                 ->setAdditionalInformation(
@@ -209,7 +211,7 @@ class Callback implements ActionInterface
                 ->build(Transaction::TYPE_AUTH);
         } else {
             $message = __('The captured amount is %1.', $formatedPrice);
-            $transaction = $this->_transactionBuilder->setPayment($payment)
+            $transaction = $this->transactionBuilder->setPayment($payment)
                 ->setOrder($order)
                 ->setTransactionId($response['MFUKEY'])
                 ->setAdditionalInformation(
@@ -239,7 +241,7 @@ class Callback implements ActionInterface
             $paymentToken->setPaymentMethodCode(ConfigProvider::CODE);
 
             $paymentToken->setTokenDetails($this->convertDetailsToJSON([
-                'title' => 'Cubstone',
+                'title' => 'Curbstone',
                 'type' => substr($response['MFRVNA'], 0, 2),
                 'maskedCC' => "****" . substr($response['MFCARD'], -4),
                 'expirationDate' => implode("/", str_split($response['MFEDAT'], 2)),
@@ -248,7 +250,7 @@ class Callback implements ActionInterface
             $paymentToken->setPublicHash($this->generatePublicHash($paymentToken));
 
             $this->paymentTokenRepository->save($paymentToken);
-            $this->messageManager->addSuccessMessage(__('Card has been save.'));
+            $this->messageManager->addSuccessMessage(__('Card has been saved.'));
         } catch (\Exception $e) {
             $this->messageManager->addErrorMessage(__($e->getMessage()));
         }

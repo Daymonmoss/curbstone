@@ -14,6 +14,9 @@ use Magento\Vault\Api\Data\PaymentTokenFactoryInterface;
 use Magento\Vault\Api\Data\PaymentTokenInterface;
 use Magento\Vault\Model\PaymentTokenRepository;
 use Magento\Framework\Message\ManagerInterface;
+use Magento\Framework\App\RequestInterface;
+use Magento\Framework\App\Response\RedirectInterface;
+use Magento\Framework\App\ResponseInterface;
 
 class SaveCard implements ActionInterface
 {
@@ -24,7 +27,7 @@ class SaveCard implements ActionInterface
     /**
      * @var mixed
      */
-    protected $_payLog;
+    protected $payLog;
     /**
      * @var mixed
      */
@@ -39,84 +42,110 @@ class SaveCard implements ActionInterface
     protected $customerSession;
 
     protected ManagerInterface $messageManager;
+    protected RequestInterface $request;
+    protected ResultFactory $resultFactory;
+    protected RedirectInterface $redirect;
+    protected ResponseInterface $response;
+    protected PaymentTokenRepository $paymentTokenRepository;
 
     /**
-     * @param ResultFactory $result
-     * @param CurbstoneLog $curbstoneLog
+     * @param ResultFactory $resultFactory
+     * @param CurbstoneLog $payLog
      * @param CardOnFile $cardOnFile
      * @param PaymentTokenFactoryInterface $paymentTokenFactory
      * @param EncryptorInterface $encryptor
      * @param PaymentTokenRepository $paymentTokenRepository
      * @param Session $customerSession
+     * @param ManagerInterface $messageManager
+     * @param RequestInterface $request
+     * @param RedirectInterface $redirect
+     * @param ResponseInterface $response
      */
     public function __construct(
-        ResultFactory $result,
-        CurbstoneLog $curbstoneLog,
+        ResultFactory $resultFactory,
+        CurbstoneLog $payLog,
         CardOnFile $cardOnFile,
         PaymentTokenFactoryInterface $paymentTokenFactory,
         EncryptorInterface $encryptor,
         PaymentTokenRepository $paymentTokenRepository,
         Session $customerSession,
-        ManagerInterface $messageManager
+        ManagerInterface $messageManager,
+        RequestInterface $request,
+        RedirectInterface $redirect,
+        ResponseInterface $response
     ) {
-        $this->resultFactory = $result;
+        $this->resultFactory = $resultFactory;
         $this->cardOnFile = $cardOnFile;
-        $this->_payLog = $curbstoneLog;
+        $this->payLog = $payLog;
         $this->paymentTokenFactory = $paymentTokenFactory;
         $this->encryptor = $encryptor;
         $this->paymentTokenRepository = $paymentTokenRepository;
         $this->customerSession = $customerSession;
         $this->messageManager = $messageManager;
+        $this->request = $request;
+        $this->redirect = $redirect;
+        $this->response = $response;
     }
 
     public function execute()
     {
-        $request = $this->getRequest()->getParams();
-        $this->_createCardOnFile($request);
+        $request = $this->request->getParams();
+        $this->createCardOnFile($request);
+    }
+
+    protected function redirect($path, $arguments = []): ResponseInterface
+    {
+        $this->redirect->redirect($this->response, $path, $arguments);
+        return $this->response;
     }
 
     /**
      * @param $response
      */
-    protected function _createCardOnFile($response)
+    protected function createCardOnFile($response)
     {
         $resultUrl = 'vault/cards/listaction';
         $cardOnFileAuthorize = $this->cardOnFile->convertAuthorizeData($response, $this->customerSession->getCustomer());
 
-        $this->_payLog->writePaylog("Authorize Card-on-File Request Data:");
-        $this->_payLog->writePaylog(print_r($cardOnFileAuthorize, true));
+        $this->payLog->writePaylog("Authorize Card-on-File Request Data:");
+        $this->payLog->writePaylog(print_r($cardOnFileAuthorize, true));
 
         $authorizeResponse = $this->excuteDsiApi($cardOnFileAuthorize);
         if ($authorizeResponse) {
-            $this->_payLog->writePaylog("Authorize Card-on-File Response Data:");
-            $this->_payLog->writePaylog(print_r($authorizeResponse, true));
+            $this->payLog->writePaylog("Authorize Card-on-File Response Data:");
+            $this->payLog->writePaylog(print_r($authorizeResponse, true));
             $cardOnFileVerify = $this->cardOnFile->convertVerifyData($authorizeResponse, $this->customerSession->getCustomer());
-            $this->_payLog->writePaylog("Verify Card-on-File Request Data:");
-            $this->_payLog->writePaylog(print_r($cardOnFileVerify, true));
+            $this->payLog->writePaylog("Verify Card-on-File Request Data:");
+            $this->payLog->writePaylog(print_r($cardOnFileVerify, true));
             $verifyResponse = $this->excuteDsiApi($cardOnFileVerify);
             if (array_key_exists('MFRTRN', $verifyResponse)) {
                 switch ($verifyResponse['MFRTRN']) {
                     case 'UG':
-                        $confirmation_msg = 'Transaction Processed:  ' . $verifyResponse['MFRTXT'];
-                        $this->messageManager->addSuccessMessage(__('Card has been save.'));
-                        $this->_redirect($resultUrl);
+                        $this->messageManager->addSuccessMessage(
+                            __('Transaction Processed:  ' . $response['MFRTXT'].'.' . 'Card has been saved.')
+                        );
                         $this->createVaultToken($verifyResponse);
+                        $this->redirect($resultUrl);
                         break;
                     case 'UN':
-                        $confirmation_msg = 'Transaction Processed:  ' . $verifyResponse['MFRTXT'];
+                        $this->messageManager->addSuccessMessage(
+                            __('Transaction Processed:  ' . $response['MFRTXT'])
+                        );
                         break;
                     case 'UL':
                     default:
-                        $confirmation_msg = 'Field Error Code: ' . $verifyResponse['MFATAL'] . ' - ' . $verifyResponse['MFRTXT'];
+                        $this->messageManager->addErrorMessage(
+                            __('Field Error Code: ' . $response['MFATAL'] . ' - ' . $response['MFRTXT'])
+                        );
                         break;
                 }
             } else {
                 $this->messageManager->addErrorMessage(__('Sorry, something went wrong. Please try again later.'));
-                $this->_redirect($resultUrl);
+                $this->redirect($resultUrl);
             }
         } else {
             $this->messageManager->addErrorMessage(__('Sorry, something went wrong. Please try again later.'));
-            $this->_redirect($resultUrl);
+            $this->redirect($resultUrl);
         }
 
     }
@@ -136,10 +165,8 @@ class SaveCard implements ActionInterface
             $paymentToken->setPaymentMethodCode(ConfigProvider::CODE);
 
             $paymentToken->setTokenDetails($this->convertDetailsToJSON([
-                'title' => 'Cubstone',
-                // 'incrementId' => $response['req_reference_number'],
+                'title' => 'Curbstone',
                 'type' => substr($response['MFRVNA'], 0, 2),
-                // 'maskedCC' => "****-****-****-" . substr($response['MFCARD'], -4),
                 'maskedCC' => "****" . substr($response['MFCARD'], -4),
                 'expirationDate' => implode("/", str_split($response['MFEDAT'], 2)),
             ]));
